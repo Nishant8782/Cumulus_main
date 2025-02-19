@@ -127,6 +127,23 @@ const Voicememo = ({ searchQuery }) => {
     };
   }, [isRecording, isStopped]);// Runs when `isRecording` or `isStopped` changes
 
+  useEffect(() => {
+    const audioElement = document.getElementById("audio-player");
+  
+    if (audioElement) {
+      const handleAudioEnd = () => {
+        setCurrentAudio(null); // Close the popup when audio finishes
+      };
+  
+      audioElement.addEventListener("ended", handleAudioEnd);
+  
+      return () => {
+        audioElement.removeEventListener("ended", handleAudioEnd);
+      };
+    }
+  }, [currentAudio]); // Runs whenever `currentAudio` changes
+  
+
   const handleStopRecording = () => {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
@@ -141,7 +158,7 @@ const Voicememo = ({ searchQuery }) => {
         setIsRecording(false); // Set the recording status to false
         setIsStopped(true); // Mark recording as stopped
 
-        // Clear the timer interval when recording stops
+
         if (intervalRef.current) {
           clearInterval(intervalRef.current); // Stop the timer interval
           intervalRef.current = null; // Reset the interval reference
@@ -176,24 +193,31 @@ const Voicememo = ({ searchQuery }) => {
 
   const handleClosePopup = () => {
     setShowPopup(false); // Close the popup
-    
-    // Stop the recording and reset the states
-    if (isRecording || isStopped) {
-        handleToggleRecording(); // This will stop the recording if it's ongoing
+
+    if (isRecording) {
+        // Stop the recording and reset states
+        if (mediaRecorderRef.current) {
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.onstop = () => {
+                mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+                setIsRecording(false);
+                setIsStopped(false); // Ensure "Start" is displayed
+                setAudioURL(null); // Reset audio URL
+            };
+        }
+    } else {
+        setIsStopped(false); 
     }
-    
+
     // Clear the timer interval
     clearInterval(timerRef.current);
-    timerRef.current = null; // Ensure the interval reference is cleared
+    timerRef.current = null;
 
-    // Reset duration to 0 (timer will freeze at 0)
-    setDuration(0); // Reset the timer
-
-    // Reset states to mark as stopped and not recording
-    setIsStopped(true);
-    setIsRecording(false);
-    setAudioName(''); // Reset the audio name
+    // Reset duration
+    setDuration(0);
+    setAudioName('');
 };
+
 
 
 
@@ -337,53 +361,75 @@ const Voicememo = ({ searchQuery }) => {
     setPeople([{ name: `${username} (you)`, email: storedEmail, role: "Owner" }]);
     setUsers([{ name: `${username} (you)`, email: storedEmail, role: "Owner" }]);
   }, []);
+
   const handleToggleRecording = () => {
     if (!isRecording && !isStopped) {
-        // Start recording
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const analyser = audioContext.createAnalyser();
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            analyser.fftSize = 256;
+            
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            audioContextRef.current = audioContext;
+            analyserRef.current = analyser;
+
+            const updateFrequencyData = () => {
+                analyser.getByteFrequencyData(dataArray);
+                setFrequencyData([...dataArray]);  // Update state with real-time data
+                requestAnimationFrame(updateFrequencyData);
+            };
+
+            updateFrequencyData();
+
             const mediaRecorder = new MediaRecorder(stream);
             mediaRecorderRef.current = mediaRecorder;
             mediaRecorder.start();
             if (!audioChunks.current) {
-                audioChunks.current = []; // Ensure it's initialized only once
+                audioChunks.current = [];
             }
             mediaRecorder.ondataavailable = (event) => {
-                audioChunks.current.push(event.data); // Append new chunk
+                audioChunks.current.push(event.data);
             };
+
             startTimeRef.current = Date.now();
             setIsRecording(true);
             setShowPopup(true);
+
             timerRef.current = setInterval(() => {
                 setDuration((prevTime) => prevTime + 1);
             }, 1000);
         });
     } else if (isRecording) {
-        // Stop recording
         if (mediaRecorderRef.current) {
             mediaRecorderRef.current.stop();
             mediaRecorderRef.current.onstop = () => {
-                const audioBlob = new Blob(audioChunks.current, { type: 'audio/mp3' }); // Ensure all chunks are merged
+                const audioBlob = new Blob(audioChunks.current, { type: 'audio/mp3' });
                 const url = URL.createObjectURL(audioBlob);
                 setAudioURL(url);
-                // Accumulate total duration
-                const endTime = Date.now();
-                durationRef.current += Math.round((endTime - startTimeRef.current) / 1000);
+                durationRef.current += Math.round((Date.now() - startTimeRef.current) / 1000);
                 setIsRecording(false);
                 setIsStopped(true);
                 cancelAnimationFrame(animationFrameRef.current);
-                // Stop all audio tracks
-                mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+
+                if (audioContextRef.current) {
+                    audioContextRef.current.close();
+                }
+
                 clearInterval(timerRef.current);
             };
         }
     } else if (isStopped) {
-        // Resume recording
         setIsStopped(false);
         setDuration((prevTime) => prevTime + 1);
     } else {
         clearInterval(timerRef.current);
     }
 };
+
   const handleSubmit = () => {
     // alert(`Designee: ${designee}\nMessage: ${message}\nNotify: ${notify}`);
     setShare(false);
