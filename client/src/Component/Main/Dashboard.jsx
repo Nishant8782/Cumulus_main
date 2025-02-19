@@ -1688,7 +1688,7 @@ const Dashboard = ({ folderId, onFolderSelect, searchQuery, }) => {
       // Handle the response, if needed
       // console.log("File shared successfully:", response.data);
       // const [shareFolderModal, setShareFolderModal] = useState(false);
-
+      fetchFiles();
     } catch (error) {
       console.error("Error sharing file:", error);
     }
