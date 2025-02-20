@@ -399,9 +399,14 @@ const Voicememo = ({ searchQuery }) => {
             setIsRecording(true);
             setShowPopup(true);
 
-            timerRef.current = setInterval(() => {
-                setDuration((prevTime) => prevTime + 1);
-            }, 1000);
+
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+          }
+
+          timerRef.current = setInterval(() => {
+              setDuration((prevTime) => prevTime);
+          }, 1000);
         });
     } else if (isRecording) {
         if (mediaRecorderRef.current) {
@@ -419,7 +424,10 @@ const Voicememo = ({ searchQuery }) => {
                     audioContextRef.current.close();
                 }
 
-                clearInterval(timerRef.current);
+                if (timerRef.current) {
+                  clearInterval(timerRef.current);
+                  timerRef.current = null; 
+              }
             };
         }
     } else if (isStopped) {
@@ -606,7 +614,9 @@ const Voicememo = ({ searchQuery }) => {
             setAudioName('');
             setShowPopup(false);
             setDuration(0);
-            audioChunks.current = []; // Clear recorded chunks
+            audioChunks.current = []; 
+            setIsStopped(false);
+            setIsRecording(false);
             mediaRecorderRef.current = null;
             startTimeRef.current = null;
             fetchAudioFiles();
@@ -614,8 +624,14 @@ const Voicememo = ({ searchQuery }) => {
             console.error(`Unexpected response: ${response.status}`);
         }
     } catch (error) {
-        console.error('Error saving recording:', error.response || error.message);
-        alert('Failed to save recording. Please try again.');
+      console.error('Error saving recording:', error.response || error.message);
+        
+
+      if (error.response && error.response.status === 400 && error.response.data.error) {
+          alert(error.response.data.error);
+      } else {
+          alert('Failed to save recording. Please try again.');
+      }
     }
 };
   // Fetch audio files on component mount
