@@ -35,6 +35,12 @@ router.post("/upload-voice", authenticateToken, upload, async (req, res) => {
     return res.status(401).json({ error: "User ID not found in token" });
   }
   try {
+    const existingVoices = await Voice.find({ user_id });
+    const decryptedVoiceNames = existingVoices.map(voice => decryptvoice(voice.voice_name, voice.iv_voice_name));
+    // ✅ Check if the entered voice name already exists
+    if (decryptedVoiceNames.includes(voice_name)) {
+      return res.status(400).json({ error: `A voice named "${voice_name}" already exists` });
+    }
     // Generate unique S3 key and link for the file
     const aws_file_key = `${user_id}/voicerecording_folder/${voice_name}_${Date.now()}.m4a`;
     const aws_file_link = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${aws_file_key}`;
@@ -110,8 +116,6 @@ router.post("/upload-voice", authenticateToken, upload, async (req, res) => {
     res.status(500).json({ error: "Error uploading voice recording" });
   }
 });
-
-
 
 
 // Retrieve voice data API
