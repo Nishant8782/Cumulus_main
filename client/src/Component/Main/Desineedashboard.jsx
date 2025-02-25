@@ -781,7 +781,7 @@ const Desineedashboard = ({ searchQuery }) => {
       </h1>
     </div>
     <div className="flex justify-between">
-      <div className="flex justify-between w-full mb-4">
+      <div className="flex justify-between w-full ">
         <div>
           <button className="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1">
             Lists of Designee

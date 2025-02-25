@@ -1702,19 +1702,19 @@ const Afterlifeaccess = ({ searchQuery = "" }) => {
             )}
           </div>
           <div className="hidden md:inline">
-            <table className="w-full table-auto ">
-              <thead>
+            <table className='w-full text-left'>
+              <thead  className='sticky top-0 z-30'>
                 <tr className="bg-gray-200 py-4">
-                  <th className="px-2 py-4 text-slate-500 text-left font-semibold">
+                  <th className='font-semibold text-gray-500 bg-gray-100 p-2 text-md'>
                     Shared User
                   </th>
-                  <th className="px-2 py-2 text-slate-500 text-left font-semibold">
+                  <th className='font-semibold text-gray-500 bg-gray-100 p-2 text-md'>
                     Shared Date
                   </th>
-                  <th className="px-2 py-2 text-slate-500 text-left font-semibold">
+                  <th className='font-semibold text-gray-500 bg-gray-100 p-2 text-md'>
                     Shared Item
                   </th>
-                  <th className="px-2 py-2 text-slate-500 text-left font-semibold">
+                  <th className='font-semibold text-gray-500 bg-gray-100 p-2 text-md'>
                     Access
                   </th>
                 </tr>
@@ -1722,14 +1722,14 @@ const Afterlifeaccess = ({ searchQuery = "" }) => {
               <tbody>
                 {filteredFiles.map((fileShare, index) => (
                   <tr key={index} className="border-b hover:bg-gray-50">
-                    <td className="px-2 py-3 w-[20%]">
+                    <td className="px-2 py-3 w-[25%]">
                       <div className="py-2">
                         <span className="ml-3 bg-gray-100 rounded-lg py-2 px-2 font-semibold text-sm">
                           {fileShare.designee.name}
                         </span>
                       </div>
                     </td>
-                    <td className="font-semibold text-slate-500 w-[22%] text-sm">
+                    <td className="font-semibold text-slate-500 w-[25%] text-sm">
                       {fileShare.created_at && !isNaN(new Date(fileShare.created_at))
                         ? new Date(fileShare.created_at).toLocaleString("en-US", {
                           weekday: "short",
@@ -2019,7 +2019,7 @@ const Afterlifeaccess = ({ searchQuery = "" }) => {
                     </td>
                     <td
                     
-                      className="font-medium text-gray-400 pl-2 w-[22%] relative"
+                      className="font-medium text-gray-400 pl-2 w-[15%] relative"
                       onClick={() => {
                         // console.log("wclickeddddddddddddddddddddddddddddddddd")
                         togglePopup(index)

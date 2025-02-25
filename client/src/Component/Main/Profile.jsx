@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useContext } from "react";
 import Cookies from "js-cookie";
+import {
+  Loader2
+    } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { NavLink } from "react-router-dom";
 import axios from "axios";
@@ -23,12 +26,15 @@ import profile from '../../assets/profile.png';
 import plans from '../../assets/plans.png';
 import { FAPI_URL } from "../utils/Apiconfig";
 import { FaPen } from "react-icons/fa";
+import useLoadingStore from "../../store/UseLoadingStore";
 import DropboxPicker from "../utils/GoogleDropboxPicker";
 import GainAccess from "./gainaccess"
+import { Check, X } from "lucide-react";
 const DROPBOX_APP_KEY = "oy5t6b3unmpbk0b";  // Replace with your actual Dropbox App Key
 const DROPBOX_APP_SECRET = "4jne7a8ly866znt";  // Replace with your actual Dropbox App Secret setGoogleemail  deletebutton1
 const DROPBOX_REDIRECT_URI = `${FAPI_URL}/my-profile`;
 const Profile = () => {
+  const { isLoading, showLoading, hideLoading } = useLoadingStore();
   const [folderSize, setFolderSize] = useState(null);
   const [deletebutton1, setDeletebutton1] = useState(null);
   const [error, setError] = useState(null);
@@ -39,10 +45,12 @@ const Profile = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [accessToken, setAccessToken] = useState(localStorage.getItem("dropboxAccessToken") || "");
   const [googleUser, setGoogleUser] = useState(null);
-  const [information,setInformation ] = useState(null);
+  const [information, setInformation] = useState(null);
   const [googleemail, setGoogleemail] = useState(null);
   const [validate, setValidate] = useState(true);
   const [plan, setPlan] = useState("");
+  const [cut, setCut] = useState(false);
+  const [UpdatePassword, setUpdatePassword] = useState(false)
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
   const [userDetails, setUserDetails] = useState({
     name: "",
@@ -54,7 +62,7 @@ const Profile = () => {
   const navigate = useNavigate();
   // Fetch user details on component mount
   const [message, setMessage] = useState("");
-  const [showPopup, setShowPopup] = useState(false); 
+  const [showPopup, setShowPopup] = useState(false);
   const [socialSecurityNumber, setSocialSecurityNumber] = useState("");
   const [homeAddress, setHomeAddress] = useState("");
   const [formData, setFormData] = useState({
@@ -66,6 +74,9 @@ const Profile = () => {
     address: false,
   });
   const [status, setStatus] = useState(false); // Default status is false
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [checkpass, setCheckpass] = useState("");
   
   const [socialSecurityPass, setSocialSecurityPass] = useState("");
   const [loading, setLoading] = useState(false);
@@ -91,7 +102,7 @@ const Profile = () => {
         setStatus(false);
         setValidate(false);
         setInformation(true);
-      
+
       } else {
         setMessage(data.message);
         alert("Please enter valid key")
@@ -157,7 +168,7 @@ const Profile = () => {
   useEffect(() => {
     fetchsecurityUserDetails();
   }, []);
-  
+
   const handleSave = async () => {
     setLoading(true);
     setMessage("");
@@ -189,204 +200,207 @@ const Profile = () => {
     setLoading(false);
   };
 
-    const getUserData = async () => {
-      try {
-        const data = await fetchUserData();
-        if (!data?.user) {
-          throw new Error("Invalid response structure");
-        }
-  
-        if (data.user.memberships?.length > 0) {
-          // console.log("inside");
-          const latestMembership = data.user.memberships[data.user.memberships.length - 1];
-          const latestSubscriptionName = latestMembership.subscription_id.subscription_name;
-          setPlan(latestSubscriptionName);
-        }
-  
-        // Store Google Drive token if connected
-        const googleDrive = data.user.googleDrive?.[0];
-        if (googleDrive?.connected && googleDrive?.accessToken) {
-          localStorage.setItem("googleDriveToken", googleDrive.accessToken);
-          localStorage.setItem("googleDriveConnected", true);
-          setIsGoogleConnected(true);
-        } else {
-          localStorage.removeItem("googleDriveToken");
-          localStorage.setItem("googleDriveConnected", false);
-          setIsGoogleConnected(false);
-        }
-  
-
-  
-        // Store Dropbox token if connected
-        const dropbox = data.user.dropbox?.[0];
-        if (dropbox?.connected && dropbox?.accessToken) {
-          localStorage.setItem("dropboxToken", dropbox.accessToken);
-          localStorage.setItem("dropboxConnected", true);
-          setIsConnected(true);
-        } else {
-          localStorage.removeItem("dropboxToken");
-          localStorage.setItem("dropboxConnected", false);
-          setIsConnected(false);
-        } 
-
-
-  // console.log("helowwwww dropbox",dropbox?.connected && dropbox?.accessToken);
-  // console.log("helowwwww drive" ,googleDrive?.connected && googleDrive?.accessToken);
-      } catch (err) {
-        // console.error(err.message || "Failed to fetch user data");
+  const getUserData = async () => {
+    try {
+      const data = await fetchUserData();
+      if (!data?.user) {
+        throw new Error("Invalid response structure");
       }
-    };
-    useEffect(() => {
-      getUserData();
-    }, []);
 
-    useEffect(() => {
-      // console.log("Latest Subscription Name:", plan);
-    }, [plan]);
-
-
-
-    const handleDropboxAuth = () => {
-      if (plan !== "Legacy (Premium)" && plan !== "Heritage (Enterprise)") {
-        setDeletebutton1(true);
-        // console.log("inside auth"); 
-        return;
-    } else {
-        setDeletebutton1(false);
-    }
-      const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_APP_KEY}&response_type=code&redirect_uri=${encodeURIComponent(
-        DROPBOX_REDIRECT_URI
-      )}`;
-      window.location.href = authUrl; // Redirect user to Dropbox authentication
-    };
-  
-    // Handle Dropbox Callback to exchange code for access token
-    const handleDropboxCallback = async (code) => {
-      try {
-        // console.log("Received Dropbox authorization code:", code);
-    
-        const data = new URLSearchParams();
-        data.append("code", code);
-        data.append("grant_type", "authorization_code");
-        data.append("client_id", DROPBOX_APP_KEY);
-        data.append("client_secret", DROPBOX_APP_SECRET);
-        data.append("redirect_uri", DROPBOX_REDIRECT_URI);
-    
-        const response = await axios.post(
-          "https://api.dropboxapi.com/oauth2/token",
-          data,
-          {
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-          }
-        );
-    // console.log("response",response);
-        const { access_token } = response.data;
-        // console.log("Received Dropbox access token:", access_token);
-    
-        if (!access_token) {
-          throw new Error("Access token is null. Check the Dropbox API response.");
-        }
-        updateCloudConnections("","",true,access_token);
-
-        setIsConnected(true);
-        const accessToken = localStorage.getItem("dropboxAccessToken");
-        // console.log("acccessssstokeeennn",accessToken);
-      } catch (error) {
-        // console.error("Error exchanging Dropbox code for token:", error.response ? error.response.data : error.message);
+      if (data.user.memberships?.length > 0) {
+        // console.log("inside");
+        const latestMembership = data.user.memberships[data.user.memberships.length - 1];
+        const latestSubscriptionName = latestMembership.subscription_id.subscription_name;
+        setPlan(latestSubscriptionName);
       }
-    };
-    
-    const updateCloudConnections = async (googleDriveConnected, googleDriveToken, dropboxConnected, dropboxToken) => {
-      // console.log("122");
-      const url = `${API_URL}/api/auth/update-cloud-connections`;
-      const token = localStorage.getItem("token");
-      const payload = {};
-    
-      // console.log("googleDriveConnected", googleDriveConnected);
-    
-      // Check if the parameter is explicitly passed, even if it's false
-      if (typeof googleDriveConnected === "boolean") {
-        payload.googleDriveConnected = googleDriveConnected;
-      }
-      
-      if (googleDriveToken) {
-        payload.googleDriveToken = googleDriveToken;
-      }
-    
-      if (typeof dropboxConnected === "boolean") {
-        payload.dropboxConnected = dropboxConnected;
-      }
-    
-      if (dropboxToken) {
-        payload.dropboxToken = dropboxToken;
-      }
-    
-      // console.log("payload", payload);
-      // console.log("token", token);
-    
-      try {
-        const response = await axios.post(url, payload, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-    
-        // console.log("Cloud connections updated successfully:", response.data);
-        getUserData();
-      } catch (error) {
-        // console.error("Error updating cloud connections:", error.response ? error.response.data : error.message);
-        getUserData();
-      }
-    };
-    
-    
-    
-    
-    // Handle Dropbox disconnection
-    const handleDropboxDisconnect = () => {
-      // console.log("dropbox");
-      // localStorage.removeItem("dropboxToken");
-      updateCloudConnections("","",false,"");
-      // setIsConnected(false);
-      // getUserData();
-    };
 
-    const handledriveDisconect = () => {
-      // console.log("drive");
-      // localStorage.removeItem("googleDriveToken");
-      updateCloudConnections(false,"","","");
-      // setIsGoogleConnected(false);
-      // getUserData();
-    };
-  
-    // Check if Dropbox account is already connected on page load
-    useEffect(() => {
-      const accessToken = localStorage.getItem("dropboxToken");
-      // console.log("acccessssstokeeennn",accessToken);
-      if (accessToken) {
-        setIsConnected(true);
-
-      }
-  
-      // If the page contains a "code" query parameter, handle the callback
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get("code");
-      if (code) {
-        handleDropboxCallback(code); // Call the function to exchange code for access token
-      }
-    }, []);
-
-
-    useEffect(() => {
-      const accessgoogletoken = localStorage.getItem("googleDriveToken");
-      // console.log("acccessssstokeee3333nnn",accessgoogletoken);
-      if (accessgoogletoken) {
+      // Store Google Drive token if connected
+      const googleDrive = data.user.googleDrive?.[0];
+      if (googleDrive?.connected && googleDrive?.accessToken) {
+        localStorage.setItem("googleDriveToken", googleDrive.accessToken);
+        localStorage.setItem("googleDriveConnected", true);
         setIsGoogleConnected(true);
-        setGoogleemail(googleemail);
+      } else {
+        localStorage.removeItem("googleDriveToken");
+        localStorage.setItem("googleDriveConnected", false);
+        setIsGoogleConnected(false);
       }
-    }, []);
+
+
+
+      // Store Dropbox token if connected
+      const dropbox = data.user.dropbox?.[0];
+      if (dropbox?.connected && dropbox?.accessToken) {
+        localStorage.setItem("dropboxToken", dropbox.accessToken);
+        localStorage.setItem("dropboxConnected", true);
+        setIsConnected(true);
+      } else {
+        localStorage.removeItem("dropboxToken");
+        localStorage.setItem("dropboxConnected", false);
+        setIsConnected(false);
+      }
+
+
+      // console.log("helowwwww dropbox",dropbox?.connected && dropbox?.accessToken);
+      // console.log("helowwwww drive" ,googleDrive?.connected && googleDrive?.accessToken);
+    } catch (err) {
+      // console.error(err.message || "Failed to fetch user data");
+    }
+  };
+  useEffect(() => {
+    getUserData();
+  }, []);
+
+  useEffect(() => {
+    // console.log("Latest Subscription Name:", plan);
+  }, [plan]);
+
+
+  const updatePassword = () => {
+    setUpdatePassword(true);
+  }
+
+  const handleDropboxAuth = () => {
+    if (plan !== "Legacy (Premium)" && plan !== "Heritage (Enterprise)") {
+      setDeletebutton1(true);
+      // console.log("inside auth"); 
+      return;
+    } else {
+      setDeletebutton1(false);
+    }
+    const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_APP_KEY}&response_type=code&redirect_uri=${encodeURIComponent(
+      DROPBOX_REDIRECT_URI
+    )}`;
+    window.location.href = authUrl; // Redirect user to Dropbox authentication
+  };
+
+  // Handle Dropbox Callback to exchange code for access token
+  const handleDropboxCallback = async (code) => {
+    try {
+      // console.log("Received Dropbox authorization code:", code);
+
+      const data = new URLSearchParams();
+      data.append("code", code);
+      data.append("grant_type", "authorization_code");
+      data.append("client_id", DROPBOX_APP_KEY);
+      data.append("client_secret", DROPBOX_APP_SECRET);
+      data.append("redirect_uri", DROPBOX_REDIRECT_URI);
+
+      const response = await axios.post(
+        "https://api.dropboxapi.com/oauth2/token",
+        data,
+        {
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        }
+      );
+      // console.log("response",response);
+      const { access_token } = response.data;
+      // console.log("Received Dropbox access token:", access_token);
+
+      if (!access_token) {
+        throw new Error("Access token is null. Check the Dropbox API response.");
+      }
+      updateCloudConnections("", "", true, access_token);
+
+      setIsConnected(true);
+      const accessToken = localStorage.getItem("dropboxAccessToken");
+      // console.log("acccessssstokeeennn",accessToken);
+    } catch (error) {
+      // console.error("Error exchanging Dropbox code for token:", error.response ? error.response.data : error.message);
+    }
+  };
+
+  const updateCloudConnections = async (googleDriveConnected, googleDriveToken, dropboxConnected, dropboxToken) => {
+    // console.log("122");
+    const url = `${API_URL}/api/auth/update-cloud-connections`;
+    const token = localStorage.getItem("token");
+    const payload = {};
+
+    // console.log("googleDriveConnected", googleDriveConnected);
+
+    // Check if the parameter is explicitly passed, even if it's false
+    if (typeof googleDriveConnected === "boolean") {
+      payload.googleDriveConnected = googleDriveConnected;
+    }
+
+    if (googleDriveToken) {
+      payload.googleDriveToken = googleDriveToken;
+    }
+
+    if (typeof dropboxConnected === "boolean") {
+      payload.dropboxConnected = dropboxConnected;
+    }
+
+    if (dropboxToken) {
+      payload.dropboxToken = dropboxToken;
+    }
+
+    // console.log("payload", payload);
+    // console.log("token", token);
+
+    try {
+      const response = await axios.post(url, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // console.log("Cloud connections updated successfully:", response.data);
+      getUserData();
+    } catch (error) {
+      // console.error("Error updating cloud connections:", error.response ? error.response.data : error.message);
+      getUserData();
+    }
+  };
+
+
+
+
+  // Handle Dropbox disconnection
+  const handleDropboxDisconnect = () => {
+    // console.log("dropbox");
+    // localStorage.removeItem("dropboxToken");
+    updateCloudConnections("", "", false, "");
+    // setIsConnected(false);
+    // getUserData();
+  };
+
+  const handledriveDisconect = () => {
+    // console.log("drive");
+    // localStorage.removeItem("googleDriveToken");
+    updateCloudConnections(false, "", "", "");
+    // setIsGoogleConnected(false);
+    // getUserData();
+  };
+
+  // Check if Dropbox account is already connected on page load
+  useEffect(() => {
+    const accessToken = localStorage.getItem("dropboxToken");
+    // console.log("acccessssstokeeennn",accessToken);
+    if (accessToken) {
+      setIsConnected(true);
+
+    }
+
+    // If the page contains a "code" query parameter, handle the callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get("code");
+    if (code) {
+      handleDropboxCallback(code); // Call the function to exchange code for access token
+    }
+  }, []);
+
+
+  useEffect(() => {
+    const accessgoogletoken = localStorage.getItem("googleDriveToken");
+    // console.log("acccessssstokeee3333nnn",accessgoogletoken);
+    if (accessgoogletoken) {
+      setIsGoogleConnected(true);
+      setGoogleemail(googleemail);
+    }
+  }, []);
 
 
   const handleGoogleAuth = () => {
@@ -403,7 +417,7 @@ const Profile = () => {
           // console.log("✅ Auth successful:", response);
           // localStorage.setItem("googleToken", response.access_token);
           setIsGoogleConnected(true);
-          updateCloudConnections(true,response.access_token,"","");
+          updateCloudConnections(true, response.access_token, "", "");
           // Fetch user profile info dynamically
           fetchGoogleUser(response.access_token);
         } else {
@@ -470,91 +484,159 @@ const Profile = () => {
 
     fetchFolderSize();
   }, []);
- 
-    const fetchUserDetails = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(`${API_URL}/api/auth/get-personaluser-details`, {
-          headers: {
-            Authorization: `Bearer ${token}`, // Assuming token is stored in localStorage
-          },
-        });
-        setUserDetails({
-          name: response.data.user.username,
-          email: response.data.user.email,
-          phone: response.data.user.phoneNumber,
-        });
-      } catch (error) {
-        // console.error("Error fetching user details:", error);
-      }
-    };
-    
-// Fetch the profile picture when the component mounts
-const fetchProfilePicture = async () => {
-  try {
-    const response = await axios.get(`${API_URL}/api/auth/get-profile-picture`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`, // Assuming you store the token in localStorage
-      },
-    });
-    setProfilePicture(response.data.profilePicture); // Set the profile picture URL in state
-  } catch (error) {
-    // console.error("Error fetching profile picture:", error);
-  }
-};
 
-    useEffect(() => {
+  const fetchUserDetails = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${API_URL}/api/auth/get-personaluser-details`, {
+        headers: {
+          Authorization: `Bearer ${token}`, // Assuming token is stored in localStorage
+        },
+      });
+      setUserDetails({
+        name: response.data.user.username,
+        email: response.data.user.email,
+        phone: response.data.user.phoneNumber,
+      });
+    } catch (error) {
+      // console.error("Error fetching user details:", error);
+    }
+  };
+
+  const checkpassword = async () => {
   
-      fetchProfilePicture();
-    }, []);
+    console.log("Email:", userDetails.email);
+    console.log("Password:", checkpass);
+    const email=userDetails.email;   
+     const password = checkpass;
+    // Clear previous errors
+    setError("");
+    // Validate input fields
+    if (!email) {
+        setError("Email is required.");
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setError("Please enter a valid email address.");
+        return;
+    }
+    if (!password) {
+        setError("Password is required.");
+        return;
+    }
+    const loginRequestBody = { email, password };
+    console.log("Login Payload:", loginRequestBody);
+    try {
+        showLoading();
+        const response = await fetch(`${API_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(loginRequestBody),
+        });
+        console.log('Response status:', response.status);
+        if (response.status === 400) {
+            const errorData = await response.json();
+            console.log("Error Response Data:", errorData);
+            setError(errorData.message || "Incorrect email or password.");
+            return;
+        }
+        handleChangePassword();
+    } catch (error) {
+        hideLoading();
+        console.error("Login error:", error);
+        setError("There was an error during login. Please try again.");
+    }
+  
+};
+const handleChangePassword = async () => {
+    console.log("newPassword", password);
+    console.log("newPassword", confirm);
+    console.log("userDetails.email", userDetails.email);
+ 
+    try {
+      const response = await fetch(`${API_URL}/api/auth/update-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: userDetails.email, newPassword: confirm }), // FIXED: Changed "password" to "newPassword"
+      });
+      if (!response.ok) {
+        throw new Error("Failed to update password");
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+    finally{
+      setUpdatePassword(null);
+      hideLoading();
+  }
+  };
+
+  // Fetch the profile picture when the component mounts
+  const fetchProfilePicture = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/auth/get-profile-picture`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`, // Assuming you store the token in localStorage
+        },
+      });
+      setProfilePicture(response.data.profilePicture); // Set the profile picture URL in state
+    } catch (error) {
+      // console.error("Error fetching profile picture:", error);
+    }
+  };
+
+  useEffect(() => {
+
+    fetchProfilePicture();
+  }, []);
 
 
   useEffect(() => {
-    
+
     fetchUserDetails();
   }, []);
 
 
   async function logout() {
     try {
-        const token = localStorage.getItem("token");
+      const token = localStorage.getItem("token");
 
-        if (!token) {
-            throw new Error("No token found. Please log in again.");
-        }
+      if (!token) {
+        throw new Error("No token found. Please log in again.");
+      }
 
-        const apiUrl = `${API_URL}/api/auth/signout`;
+      const apiUrl = `${API_URL}/api/auth/signout`;
 
-        const headers = {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-        };
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
 
-        const response = await fetch(apiUrl, { method: "POST", headers });
+      const response = await fetch(apiUrl, { method: "POST", headers });
 
-        if (!response.ok) {
-            throw new Error("Failed to log out. Please try again.");
-        }
+      if (!response.ok) {
+        throw new Error("Failed to log out. Please try again.");
+      }
 
-        // Clear token from localStorage
-        localStorage.removeItem("token");
-        localStorage.removeItem("googleDriveToken");
-        localStorage.removeItem("dropboxToken");
-        // Clear cookies if used
-        Cookies.remove("token");
+      // Clear token from localStorage
+      localStorage.removeItem("token");
+      localStorage.removeItem("googleDriveToken");
+      localStorage.removeItem("dropboxToken");
+      // Clear cookies if used
+      Cookies.remove("token");
 
-        // Prevent cached pages from being accessed
+      // Prevent cached pages from being accessed
+      window.history.pushState(null, null, window.location.href);
+      window.addEventListener("popstate", () => {
         window.history.pushState(null, null, window.location.href);
-        window.addEventListener("popstate", () => {
-            window.history.pushState(null, null, window.location.href);
-        });
+      });
 
-        // Redirect to the login page
-        navigate("/Login");
+      // Redirect to the login page
+      navigate("/Login");
     } catch (error) {
-        // console.error(error);
+      // console.error(error);
     }
-}
+  }
 
   // Handle profile picture upload
   const handleImageChange = async (e) => {
@@ -596,6 +678,7 @@ const fetchProfilePicture = async () => {
   };
   const toggleEditMode = () => {
     setIsEditMode(!isEditMode);
+    setCut(true);
   };
   const handleInputChange = (e) => {
     const { id, value } = e.target;
@@ -634,18 +717,18 @@ const fetchProfilePicture = async () => {
     }
   };
 
-const convertToGB = (value, unit) => {
-  switch (unit.toLowerCase()) {
-    case "kb":
-      return value / (1024 * 1024); // KB to GB
-    case "mb":
-      return value / 1024; // MB to GB
-    case "gb":
-      return value; // Already in GB
-    default:
-      return 0; // Default for unknown units
-  }
-};
+  const convertToGB = (value, unit) => {
+    switch (unit.toLowerCase()) {
+      case "kb":
+        return value / (1024 * 1024); // KB to GB
+      case "mb":
+        return value / 1024; // MB to GB
+      case "gb":
+        return value; // Already in GB
+      default:
+        return 0; // Default for unknown units
+    }
+  };
   return (
     <div className="bg-gray-50 p-6">
       <div className="mx-auto">
@@ -660,15 +743,15 @@ const convertToGB = (value, unit) => {
               <div className="relative w-16 h-16 group">
                 <div className="w-full h-full rounded-full overflow-hidden">
                   {/* Display the profile picture if available */}
-        {profilePicture ? (
-          <img
-            src={profilePicture}
-            alt="Profile"
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-gray-300 flex items-center justify-center text-white">No Image</div> // Fallback if no image
-        )}
+                  {profilePicture ? (
+                    <img
+                      src={profilePicture}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-300 flex items-center justify-center text-white">No Image</div> // Fallback if no image
+                  )}
                 </div>
                 <div
                   className="absolute cursor-pointer inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
@@ -726,7 +809,15 @@ const convertToGB = (value, unit) => {
                     onClick={toggleEditMode}
                   ></i> */}
                   </div>
-                  <img src={profileicon} className="h-[37px] mt-1" alt="" onClick={toggleEditMode} />
+                  <img src={profileicon} className={`${cut ? 'hidden' : 'inline'} h-[37px] mt-1`} alt="" onClick={toggleEditMode} />
+                  {
+                    cut &&
+                    <p onClick={() => {
+                      setIsEditMode(false);
+                      setCut(false);
+                    }}>
+                      <X className="mt-3 text-gray-500" /></p>
+                  }
                 </div>
                 <div className="px-6 py-3 border-b-2 border-[#ececec]">
                   <p className="text-gray-500">Name</p>
@@ -770,194 +861,269 @@ const convertToGB = (value, unit) => {
                     />
                   )}
                 </div>
-                <div className="mb-4 px-6 pb-3">
+                <div className="mb-4 px-6 pb-3 flex gap-x-2 justify-end">
                   {isEditMode && (
+                    <>
+                      <button
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                        onClick={updatePassword}
+                      >
+                        Update Password
+                      </button>
+                      <button
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                        onClick={saveChanges}>
+                        Save
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              {
+                UpdatePassword && (
+                  <>
+                    <div className="flex justify-center items-center fixed inset-0 h-screen w-screen z-20 bg-black bg-opacity-40">
+                      <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+                        <div className="flex justify-between">
+                          <button></button>
+                          <button
+                            onClick={() => setUpdatePassword(false)}
+                          >
+                            <X className="text-red-600" />
+                          </button>
+                        </div>
+                        <h2 className="text-xl font-semibold mb-4 text-center">Update Password</h2>
+
+                        <label className="block text-sm font-medium text-gray-700">Previous Password</label>
+                        <input
+                          type="password"
+                          className="w-full px-4 py-2 mt-1 mb-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Enter previous password"
+                          value={checkpass}
+            onChange={(e) => setCheckpass(e.target.value)}
+                        />
+
+                        <label className="block text-sm font-medium text-gray-700">New Password</label>
+                        <input
+                          type="password"
+                          className="w-full px-4 py-2 mt-1 mb-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Enter new password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                        />
+                           <label className="block text-sm font-medium text-gray-700">Confirm  Password</label>
+                        <input
+                          type="password"
+                          className="w-full px-4 py-2 mt-1 mb-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Confirm new password" 
+                            value={confirm}
+                          onChange={(e) => setConfirm(e.target.value)}
+                        />
+
+                        {/* <button
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition duration-300"
+                        onClick={()=>checkpassword()}
+                        >
+                          Update Password
+                        </button> */}
+
+{isLoading ?  ( <button
+                            type="submit"
+                            className="cursor-not-allowed flex justify-center  bg-blue-400 w-full py-2 rounded-md text-white"
+                        >
+                        <Loader2 className="animate-spin h-6 w-6 font-bold"/>
+                        </button>):(<button
+                            type="submit"
+                            className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 transition "
+                            onClick={()=>checkpassword()}
+                        >
+                          Update Password
+                        </button>
+)}
+                      </div>
+                    </div>
+
+                  </>
+                )
+              }
+              <div className="bg-white p-6 rounded-[20px] border-2 border-[#ececec]">
+                {/* Header Section */}
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="bg-gray-200 p-2 rounded-full">
+                    <img
+                      src={profile}
+                      alt="Google Drive"
+                      className="w-8 h-8"
+                    />
+                  </div>
+                  <h2 className="text-lg font-semibold text-gray-800">Accounts</h2>
+                </div>
+
+                {/* Google Drive Account */}
+                <div className="flex items-center justify-between border-b border-gray-300 pb-4 mb-4">
+                  <div className="flex items-center space-x-3">
+                    <img src={googledrive} alt="Google Drive" className="w-8 h-8" />
+                    <div>
+                      <p className="text-gray-900 font-medium">Google Drive</p>
+                      <p className="text-sm text-gray-500">{googleemail ? googleemail : ""}</p>
+
+                    </div>
+                  </div>
+
+                  {/* Toggle Button */}
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={isGoogleConnected}
+                      onChange={() => {
+
+                        // console.log("1");
+                        if (isGoogleConnected) {
+                          handledriveDisconect();
+                        } else {
+                          handleGoogleAuth();
+                        }
+                      }
+                      }
+                    />
+                    <div className="w-10 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-400 rounded-full peer peer-checked:bg-green-500 transition-all"></div>
+                    <span className="w-4 h-4 bg-white rounded-full absolute left-1 top-1 peer-checked:translate-x-4 transition-transform"></span>
+                  </label>
+
+                </div>
+
+                {/* DropBox Account */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <img src={dropbox} alt="" className="w-8 h-8" />
+                    <p className="text-gray-900 font-medium">Dropbox</p>
+                  </div>
+                  {isConnected ? (
                     <button
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg"
-                      onClick={saveChanges}>
-                      Save
+                      className="text-sm font-medium text-gray-600 bg-gray-100 px-4 py-1 rounded-full border border-gray-300 hover:bg-gray-200 transition hover:text-red-500"
+                      onClick={handleDropboxDisconnect} // Disconnect Dropbox
+                    >
+                      Disconnect
+                    </button>
+                  ) : (
+                    <button
+                      className="text-sm font-medium text-gray-600 bg-gray-100 px-4 py-1 rounded-full border border-gray-300 hover:bg-gray-200 transition  hover:text-green-500"
+                      onClick={handleDropboxAuth}
+                    >
+                      Connect
                     </button>
                   )}
                 </div>
               </div>
-              
-              <div className="bg-white p-6 rounded-[20px] border-2 border-[#ececec]">
-      {/* Header Section */}
-      <div className="flex items-center space-x-3 mb-6">
-        <div className="bg-gray-200 p-2 rounded-full">
-        <img
-            src={profile}
-            alt="Google Drive"
-            className="w-8 h-8"
-          />
-        </div>
-        <h2 className="text-lg font-semibold text-gray-800">Accounts</h2>
-      </div>
+              {validate && (
+                //         <div className="bg-white p-6 rounded-[20px] border-2 border-[#ececec]">
+                //           <div className="flex items-center justify-start mb-4">
+                //             <span className="rounded-full p-2 bg-white shadow-md">
+                //               <img src={key} alt="" className="h-[25px]" />
+                //             </span>
+                //             <h2 className="text-lg font-semibold ml-2">Secure Personal Information</h2>
+                //           </div>
+                //           <p className="text-gray-500 mb-4">
+                //             Please re-enter your password to view or edit this information.
+                //           </p>
+                //           {/* <button className="bg-blue-600 text-white px-4 py-2 rounded-lg">
+                //             Gain Access
+                //           </button> */}
+                //           <button className="text-blue-600 border w-full 2xl:w-4/12 font-medium hover:border-green-400 border-[#0067FF] px-4 py-2 rounded-lg text-sm hover:text-green-500" onClick={handleGainAccess}>Gain Access</button>
+                //           {showPopup && (
+                //   <GainAccess onClose={() => setShowPopup(false)} onVerified={() => setShowPopup(false)} />
+                // )}
+                //         </div>
 
-      {/* Google Drive Account */}
-      <div className="flex items-center justify-between border-b border-gray-300 pb-4 mb-4">
-    <div className="flex items-center space-x-3">
-      <img src={googledrive} alt="Google Drive" className="w-8 h-8" />
-      <div>
-        <p className="text-gray-900 font-medium">Google Drive</p>
-    <p className="text-sm text-gray-500">{googleemail ? googleemail : ""}</p>
-
-      </div>
-    </div>
-
-    {/* Toggle Button */}
-    <label className="relative inline-flex items-center cursor-pointer">
-  <input
-    type="checkbox"
-    className="sr-only peer"
-    checked={isGoogleConnected}
-    onChange={() => {
-     
-        // console.log("1");
-      if (isGoogleConnected) {
-        handledriveDisconect();
-      } else {
-        handleGoogleAuth();
-      }
-    }
-}
-  />
-  <div className="w-10 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-400 rounded-full peer peer-checked:bg-green-500 transition-all"></div>
-  <span className="w-4 h-4 bg-white rounded-full absolute left-1 top-1 peer-checked:translate-x-4 transition-transform"></span>
-</label>
-
-  </div>
-
-      {/* DropBox Account */}
-      <div className="flex items-center justify-between">
-      <div className="flex items-center space-x-3">
-        <img src={dropbox} alt="" className="w-8 h-8" />
-        <p className="text-gray-900 font-medium">Dropbox</p>
-      </div>
-      {isConnected ? (
-        <button
-          className="text-sm font-medium text-gray-600 bg-gray-100 px-4 py-1 rounded-full border border-gray-300 hover:bg-gray-200 transition hover:text-red-500"
-          onClick={handleDropboxDisconnect} // Disconnect Dropbox
-        >
-          Disconnect
-        </button>
-      ) : (
-        <button
-          className="text-sm font-medium text-gray-600 bg-gray-100 px-4 py-1 rounded-full border border-gray-300 hover:bg-gray-200 transition  hover:text-green-500"
-          onClick={handleDropboxAuth}
-        >
-          Connect
-        </button>
-      )}
-    </div>
-    </div>
-    {validate && (
-      //         <div className="bg-white p-6 rounded-[20px] border-2 border-[#ececec]">
-      //           <div className="flex items-center justify-start mb-4">
-      //             <span className="rounded-full p-2 bg-white shadow-md">
-      //               <img src={key} alt="" className="h-[25px]" />
-      //             </span>
-      //             <h2 className="text-lg font-semibold ml-2">Secure Personal Information</h2>
-      //           </div>
-      //           <p className="text-gray-500 mb-4">
-      //             Please re-enter your password to view or edit this information.
-      //           </p>
-      //           {/* <button className="bg-blue-600 text-white px-4 py-2 rounded-lg">
-      //             Gain Access
-      //           </button> */}
-      //           <button className="text-blue-600 border w-full 2xl:w-4/12 font-medium hover:border-green-400 border-[#0067FF] px-4 py-2 rounded-lg text-sm hover:text-green-500" onClick={handleGainAccess}>Gain Access</button>
-      //           {showPopup && (
-      //   <GainAccess onClose={() => setShowPopup(false)} onVerified={() => setShowPopup(false)} />
-      // )}
-      //         </div>
-
-      <></>
-    )}
+                <></>
+              )}
               {status && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-      <div className="bg-white w-11/12 max-w-md rounded-lg shadow-lg p-6 relative">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">Sensitive Personal Information</h2>
-          <button className="text-gray-400 hover:text-gray-600">
-            <i className="fas fa-times" onClick={() => {setStatus(false)
-              setSocialSecurityPass("");
-            }}></i>
-          </button>
-        </div>
-        <p className="text-gray-600 mb-4">An extra layer of password protection for added security</p>
-        <label className="block text-gray-700 mb-2">Enter Social Security Pass</label>
-        <input
-          type="password"
-          className="w-full border border-gray-300 rounded-lg p-2 mb-4"
-          value={socialSecurityPass}
-          onChange={(e) => setSocialSecurityPass(e.target.value)}
-        />
-        <button
-          className="w-full bg-blue-600 text-white rounded-lg py-2 disabled:opacity-50"
-          onClick={handleSubmit}
-          disabled={loading}
-        >
-          Submit
-        </button>
-      </div>
-    </div>
- )}
- {information && (
-  <div className="">
-  <div className="flex items-center mb-4">
-    <img
-      src="https://storage.googleapis.com/a1aa/image/dAx-e24EbgXzqmzZ8lUNBHQtNAzj3eYYasPS1I7Em3Q.jpg"
-      alt="Key icon"
-      className="w-6 h-6 mr-2"
-    />
-    <h2 className="text-lg font-semibold">Sensitive Personal Information</h2>
-  </div>
-  {/* Social Security Number */}
-  <div className="mb-4">
-    <div className="flex items-center justify-between mb-1">
-      <label className="text-gray-700">Social Security Number</label>
-      <FaPen
-        className="text-gray-400 cursor-pointer"
-        onClick={() => toggleEdit("ssn")}
-      />
-    </div>
-    <input
-      className="bg-blue-100 text-blue-600 p-2 rounded w-full"
-      id="ssn"
-      type="text"
-      value={formData.ssn}
-      onChange={handleChange}
-      disabled={!isEdditing.ssn}
-    />
-  </div>
-  {/* Home Address */}
-  <div>
-    <div className="flex items-center justify-between mb-1">
-      <label className="text-gray-700">Home Address</label>
-      <FaPen
-        className="text-gray-400 cursor-pointer"
-        onClick={() => toggleEdit("address")}
-      />
-    </div>
-    <input
-      className="bg-blue-100 text-blue-600 p-2 rounded w-full"
-      id="address"
-      type="text"
-      value={formData.address}
-      onChange={handleChange}
-      disabled={!isEdditing.address}
-    />
-  </div>
-  {/* Save Button */}
-  {(isEdditing.ssn || isEdditing.address) && (
-    <button className="bg-blue-500 text-white p-2 rounded mt-4 w-full" onClick={handleSave}>
-      Save
-    </button>
-  )}
-</div>
- )}
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+                  <div className="bg-white w-11/12 max-w-md rounded-lg shadow-lg p-6 relative">
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-lg font-semibold">Sensitive Personal Information</h2>
+                      <button className="text-gray-400 hover:text-gray-600">
+                        <i className="fas fa-times" onClick={() => {
+                          setStatus(false)
+                          setSocialSecurityPass("");
+                        }}></i>
+                      </button>
+                    </div>
+                    <p className="text-gray-600 mb-4">An extra layer of password protection for added security</p>
+                    <label className="block text-gray-700 mb-2">Enter Social Security Pass</label>
+                    <input
+                      type="password"
+                      className="w-full border border-gray-300 rounded-lg p-2 mb-4"
+                      value={socialSecurityPass}
+                      onChange={(e) => setSocialSecurityPass(e.target.value)}
+                    />
+                    <button
+                      className="w-full bg-blue-600 text-white rounded-lg py-2 disabled:opacity-50"
+                      onClick={handleSubmit}
+                      disabled={loading}
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </div>
+              )}
+              {information && (
+                <div className="">
+                  <div className="flex items-center mb-4">
+                    <img
+                      src="https://storage.googleapis.com/a1aa/image/dAx-e24EbgXzqmzZ8lUNBHQtNAzj3eYYasPS1I7Em3Q.jpg"
+                      alt="Key icon"
+                      className="w-6 h-6 mr-2"
+                    />
+                    <h2 className="text-lg font-semibold">Sensitive Personal Information</h2>
+                  </div>
+                  {/* Social Security Number */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-gray-700">Social Security Number</label>
+                      <FaPen
+                        className="text-gray-400 cursor-pointer"
+                        onClick={() => toggleEdit("ssn")}
+                      />
+                    </div>
+                    <input
+                      className="bg-blue-100 text-blue-600 p-2 rounded w-full"
+                      id="ssn"
+                      type="text"
+                      value={formData.ssn}
+                      onChange={handleChange}
+                      disabled={!isEdditing.ssn}
+                    />
+                  </div>
+                  {/* Home Address */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-gray-700">Home Address</label>
+                      <FaPen
+                        className="text-gray-400 cursor-pointer"
+                        onClick={() => toggleEdit("address")}
+                      />
+                    </div>
+                    <input
+                      className="bg-blue-100 text-blue-600 p-2 rounded w-full"
+                      id="address"
+                      type="text"
+                      value={formData.address}
+                      onChange={handleChange}
+                      disabled={!isEdditing.address}
+                    />
+                  </div>
+                  {/* Save Button */}
+                  {(isEdditing.ssn || isEdditing.address) && (
+                    <button className="bg-blue-500 text-white p-2 rounded mt-4 w-full" onClick={handleSave}>
+                      Save
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-            
+
             <div className="md:w-3/5 flex flex-col w-full gap-6">
               <div className="bg-white p-6 rounded-[20px] border-2 border-[#ececec]">
                 <div className="p-6  rounded-[8px] border-2 border-[#ececec]">
@@ -968,23 +1134,23 @@ const convertToGB = (value, unit) => {
                         width:
                           folderSize && folderSize.value
                             ? `${Math.min(
-                                (convertToGB(folderSize.value, folderSize.unit) / 20) * 100,
-                                100
-                              )}%`
-                            : "0%", 
+                              (convertToGB(folderSize.value, folderSize.unit) / 20) * 100,
+                              100
+                            )}%`
+                            : "0%",
                       }}
                     ></div>
                   </div>
                   {/* <p className="text-gray-500">10.47 GB of 20 GB</p> */}
                   {error ? (
-        <p className="text-red-500">{error}</p>
-      ) : folderSize !== null ? (
-        <p className="text-gray-500">
-          {folderSize.value} {folderSize.unit} of 20 GB
-        </p>
-      ) : (
-        <p className="text-gray-500">Loading...</p>
-      )}
+                    <p className="text-red-500">{error}</p>
+                  ) : folderSize !== null ? (
+                    <p className="text-gray-500">
+                      {folderSize.value} {folderSize.unit} of 20 GB
+                    </p>
+                  ) : (
+                    <p className="text-gray-500">Loading...</p>
+                  )}
                   <div className="flex items-center justify-between ">
                     <h2 className="text-lg font-semibold">Storage Used</h2>
                   </div>
@@ -1001,17 +1167,17 @@ const convertToGB = (value, unit) => {
                   {/* <button className="text-blue-600 border font-medium border-[#0067FF] bg-[#0067FF14] px-4 py-2 rounded-lg text-sm">Deactivate Subscription</button> */}
                 </div>
                 <div className="border-2 border-blue-600 rounded-lg p-8 mb-4">
-                  <p className="text-black text-xs mb-1 font-semibold"> {userDetails.name === "Rahul" ?"STANDARD":"PREMIUM" }</p>
+                  <p className="text-black text-xs mb-1 font-semibold"> {userDetails.name === "Rahul" ? "STANDARD" : "PREMIUM"}</p>
                   <div className="flex justify-between md:mr-3 items-center flex-col lg:flex-row">
                     <div className="flex items-center">
-                      <h1 className="text-5xl font-semibold">{userDetails.name === "Rahul" ?"$4.99":"$9.99" }</h1>
+                      <h1 className="text-5xl font-semibold">{userDetails.name === "Rahul" ? "$4.99" : "$9.99"}</h1>
                       <span className="text-4xl text-gray-500 ml-2">/mo</span>
                     </div>
                     <img src={filefolder} alt="Subscription plan icon" className="mt-4 w-28" />
                   </div>
                 </div>
                 <button className="bg-blue-600 text-white px-4 py-2 rounded-lg w-full"
-                onClick={()=>setMemb(true)}>
+                  onClick={() => setMemb(true)}>
                   Upgrade Plan
                 </button>
               </div>
@@ -1030,128 +1196,129 @@ const convertToGB = (value, unit) => {
                   progress for when you return.
                 </p>
               </div>
-              
+
             </div>
           </div>
         </div>
         {memb && (
-  <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center z-50 p-4 sm:p-6">
-    <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg max-w-3xl w-full m-4 md:m-6">
-      <h1 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 text-left">Upgrade Plan</h1>
-      <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
-        {/* Legacy Plan */}
-        <div className="border rounded-lg p-4 sm:p-6 flex flex-col">
-          <div className="flex items-center mb-3 sm:mb-4">
-            <img src={plans} alt="Legacy Plan Icon" className="mr-2 sm:mr-3 h-8 sm:h-10 w-8 sm:w-10" />
-            <div>
-              <p className="text-xl sm:text-2xl font-bold">
-                $99 <span className="text-sm sm:text-lg font-normal">/Year</span>
-              </p>
-              <p className="text-md sm:text-lg">Legacy</p>
+          <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center z-50 p-4 sm:p-6">
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg max-w-3xl w-full m-4 md:m-6">
+              <h1 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 text-left">Upgrade Plan</h1>
+              <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
+                {/* Legacy Plan */}
+                <div className="border rounded-lg p-4 sm:p-6 flex flex-col">
+                  <div className="flex items-center mb-3 sm:mb-4">
+                    <img src={plans} alt="Legacy Plan Icon" className="mr-2 sm:mr-3 h-8 sm:h-10 w-8 sm:w-10" />
+                    <div>
+                      <p className="text-xl sm:text-2xl font-bold">
+                        $99 <span className="text-sm sm:text-lg font-normal">/Year</span>
+                      </p>
+                      <p className="text-md sm:text-lg">Legacy</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-1 sm:space-y-2 flex-1 text-sm sm:text-base">
+                    {[
+                      "50 GB Storage",
+                      "Enhanced Encryption",
+                      "Advanced Sharing Controls",
+                      "Advanced Nominee Assignment",
+                      "Google Drive, Dropbox Integration",
+                      "Automatic Photo Upload",
+                      "Priority Support",
+                      "Voice Memo"
+                    ].map((feature, index) => (
+                      <li key={index} className="flex items-center">
+                        <i className="fas fa-check-circle text-green-500 mr-1 sm:mr-2"></i>{feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {/* Heritage Plan */}
+                <div className="border rounded-lg p-4 sm:p-6 flex flex-col">
+                  <div className="flex items-center mb-3 sm:mb-4">
+                    <img src={plans} alt="Heritage Plan Icon" className="mr-2 sm:mr-3 h-8 sm:h-10 w-8 sm:w-10" />
+                    <div>
+                      <p className="text-xl sm:text-2xl font-bold">Custom Pricing</p>
+                      <p className="text-md sm:text-lg">Heritage</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-1 sm:space-y-2 flex-1 text-sm sm:text-base">
+                    {[
+                      "Custom Storage Options",
+                      "Top Compliance Level Encryption",
+                      "Full Sharing & Customization",
+                      "Custom Inheritance Options",
+                      "Full Suite of Integrations",
+                      "Automatic Photo Upload",
+                      "24/7 Dedicated Support",
+                      "Voice Memo, Notepad",
+                      "Customizable Solutions"
+                    ].map((feature, index) => (
+                      <li key={index} className="flex items-center">
+                        <i className="fas fa-check-circle text-green-500 mr-1 sm:mr-2"></i>{feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div className="flex justify-end mt-4 sm:mt-6">
+                <button className="text-gray-500 mr-3 sm:mr-4 text-xs sm:text-sm" onClick={() => setMemb(false)}>
+                  Cancel
+                </button>
+                <button className="bg-blue-500 text-white px-4 sm:px-6 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm hover:bg-blue-600 transition-colors">
+                  Upgrade
+                </button>
+              </div>
             </div>
           </div>
-          <ul className="space-y-1 sm:space-y-2 flex-1 text-sm sm:text-base">
-            {[
-              "50 GB Storage",
-              "Enhanced Encryption",
-              "Advanced Sharing Controls",
-              "Advanced Nominee Assignment",
-              "Google Drive, Dropbox Integration",
-              "Automatic Photo Upload",
-              "Priority Support",
-              "Voice Memo"
-            ].map((feature, index) => (
-              <li key={index} className="flex items-center">
-                <i className="fas fa-check-circle text-green-500 mr-1 sm:mr-2"></i>{feature}
-              </li>
-            ))}
-          </ul>
-        </div>
-        {/* Heritage Plan */}
-        <div className="border rounded-lg p-4 sm:p-6 flex flex-col">
-          <div className="flex items-center mb-3 sm:mb-4">
-            <img src={plans} alt="Heritage Plan Icon" className="mr-2 sm:mr-3 h-8 sm:h-10 w-8 sm:w-10" />
-            <div>
-              <p className="text-xl sm:text-2xl font-bold">Custom Pricing</p>
-              <p className="text-md sm:text-lg">Heritage</p>
-            </div>
-          </div>
-          <ul className="space-y-1 sm:space-y-2 flex-1 text-sm sm:text-base">
-            {[
-              "Custom Storage Options",
-              "Top Compliance Level Encryption",
-              "Full Sharing & Customization",
-              "Custom Inheritance Options",
-              "Full Suite of Integrations",
-              "Automatic Photo Upload",
-              "24/7 Dedicated Support",
-              "Voice Memo, Notepad",
-              "Customizable Solutions"
-            ].map((feature, index) => (
-              <li key={index} className="flex items-center">
-                <i className="fas fa-check-circle text-green-500 mr-1 sm:mr-2"></i>{feature}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-      <div className="flex justify-end mt-4 sm:mt-6">
-        <button className="text-gray-500 mr-3 sm:mr-4 text-xs sm:text-sm" onClick={() => setMemb(false)}>
-          Cancel
-        </button>
-        <button className="bg-blue-500 text-white px-4 sm:px-6 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm hover:bg-blue-600 transition-colors">
-          Upgrade
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-    {deletebutton1 && (
-        <div
-          className="fixed inset-0 w-full h-full bg-gray-800 bg-opacity-50 flex items-center justify-center z-50"
-          role="dialog"
-          aria-labelledby="deleteModalLabel"
-          aria-describedby="deleteModalDescription"
-        >
-          <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full m-2">
-            <div className="flex justify-between items-center mb-4">
-              <h2 id="deleteModalLabel" className="text-lg font-semibold">
-                Upgrade Plan
-              </h2>
-            </div>
+        )}
+        {deletebutton1 && (
+          <div
+            className="fixed inset-0 w-full h-full bg-gray-800 bg-opacity-50 flex items-center justify-center z-50"
+            role="dialog"
+            aria-labelledby="deleteModalLabel"
+            aria-describedby="deleteModalDescription"
+          >
+            <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full m-2">
+              <div className="flex justify-between items-center mb-4">
+                <h2 id="deleteModalLabel" className="text-lg font-semibold">
+                  Upgrade Plan
+                </h2>
+              </div>
 
-            <div
-              id="deleteModalDescription"
-              className="text-sm text-gray-600 mb-4"
-            >
-              Upgrade your Membership to access this features
-            </div>
-
-            <div className="flex justify-end gap-2 my-2">
-              <button
-                onClick={() => setDeletebutton1(false)}
-                className="border-2 border-blue-500 text-gray-700 px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <div
+                id="deleteModalDescription"
+                className="text-sm text-gray-600 mb-4"
               >
-                Cancel
-              </button>
-             
+                Upgrade your Membership to access this features
+              </div>
+
+              <div className="flex justify-end gap-2 my-2">
+                <button
+                  onClick={() => setDeletebutton1(false)}
+                  className="border-2 border-blue-500 text-gray-700 px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  Cancel
+                </button>
+
                 <button
                   className="bg-blue-500 text-white px-6 py-2 rounded flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  onClick={() =>{ setDeletebutton1(false)
+                  onClick={() => {
+                    setDeletebutton1(false)
                     setMemb(true);
                   }}
                 >
                   Upgrade Plan
                 </button>
-         
+
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      
+        )}
+
       </div>
 
-     
+
 
     </div>
   );
